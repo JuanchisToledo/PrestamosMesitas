@@ -1,0 +1,14 @@
+{
+  "name": "Préstamos de la mesita",
+  "short_name": "Préstamos",
+  "description": "Registro de lo que se presta de la mesita del centro de estudiantes",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f6f5f1",
+  "theme_color": "#15803d",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Préstamos de la mesita</title>
+<meta name="theme-color" content="#15803d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Préstamos">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+:root {
+  --bg: #f6f5f1; --surface: #ffffff; --text: #1d1d1b; --muted: #6b6a64; --line: #e4e2da;
+  --a0: #c2410c; --t0: #fdeee4; --a1: #1d4ed8; --t1: #e6edfd;
+  --a2: #15803d; --t2: #e3f5e9; --a3: #7e22ce; --t3: #f1e6fb;
+  --a4: #b91c1c; --t4: #fde8e8; --a5: #0f766e; --t5: #dcf5f2; --a6: #be185d; --t6: #fce7f3; --a7: #a16207; --t7: #fef3c7;
+  --danger: #b91c1c; --warn: #b45309; --warnbg: #fef3c7;
+  box-sizing: border-box; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #151513; --surface: #201f1c; --text: #f1efe8; --muted: #a09e94; --line: #34332e;
+    --a0: #fb923c; --t0: #3a2316; --a1: #7aa2ff; --t1: #1a2542; --a2: #4ade80; --t2: #14301d;
+    --a3: #c084fc; --t3: #2c1a3d;
+    --a4: #f87171; --t4: #3b1919; --a5: #2dd4bf; --t5: #10302c; --a6: #f472b6; --t6: #3a1428; --a7: #fbbf24; --t7: #3a2f10; --danger: #f87171; --warn: #fbbf24; --warnbg: #3a2f10; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #151513; --surface: #201f1c; --text: #f1efe8; --muted: #a09e94; --line: #34332e;
+  --a0: #fb923c; --t0: #3a2316; --a1: #7aa2ff; --t1: #1a2542; --a2: #4ade80; --t2: #14301d;
+  --a3: #c084fc; --t3: #2c1a3d;
+    --a4: #f87171; --t4: #3b1919; --a5: #2dd4bf; --t5: #10302c; --a6: #f472b6; --t6: #3a1428; --a7: #fbbf24; --t7: #3a2f10; --danger: #f87171; --warn: #fbbf24; --warnbg: #3a2f10; color-scheme: dark;
+}
+html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.4; -webkit-text-size-adjust: 100%; }
+main { max-width: 640px; margin: 0 auto; padding: 20px 16px 96px; }
+h1 { font-size: 1.5rem; margin: 4px 0 4px; letter-spacing: -0.01em; }
+.sub { color: var(--muted); margin: 0 0 14px; font-size: 0.95rem; }
+.top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.me { text-align: right; font-size: 0.8rem; color: var(--muted); white-space: nowrap; }
+.me b { color: var(--text); display: block; max-width: 140px; overflow: hidden; text-overflow: ellipsis; }
+.role { display: inline-block; font-size: 0.75rem; font-weight: 600; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); margin: 3px 0; }
+.bar { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
+.btn { font: inherit; font-weight: 600; font-size: 0.92rem; color: var(--text); background: var(--surface);
+  border: 1px solid var(--line); border-radius: 10px; padding: 0 14px; min-height: 44px; cursor: pointer; }
+.btn.on { background: var(--text); color: var(--bg); }
+.btn.danger { color: var(--danger); }
+.btn.primary { background: var(--text); color: var(--bg); }
+.btn:disabled { opacity: .5; cursor: default; }
+.badge { display: inline-block; min-width: 20px; padding: 0 6px; margin-left: 6px; border-radius: 999px; background: var(--danger); color: #fff; font-size: .75rem; line-height: 20px; text-align: center; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; margin-bottom: 18px; overflow: hidden; }
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 16px; background: var(--tint); border-bottom: 1px solid var(--line); }
+.card h2 { margin: 0; font-size: 1.05rem; color: var(--accent); }
+.count { font-size: .8rem; font-weight: 600; color: var(--accent); background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; }
+.add { display: flex; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+input[type="text"], select { flex: 1; min-width: 0; font: inherit; font-size: 16px; color: var(--text); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+input[type="text"]:focus, select:focus { outline: 2px solid var(--accent, var(--text)); outline-offset: 1px; }
+.add button { font: inherit; font-weight: 600; color: #fff; background: var(--accent); border: 0; border-radius: 10px; padding: 0 16px; min-height: 44px; cursor: pointer; }
+:root[data-theme="dark"] .add button { color: #151513; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .add button { color: #151513; } }
+.add button:disabled { opacity: .5; }
+ul { list-style: none; margin: 0; padding: 0; }
+li { display: flex; align-items: center; gap: 12px; padding: 4px 16px; border-bottom: 1px solid var(--line); min-height: 56px;
+  transition: opacity .25s, transform .25s, max-height .3s; max-height: 220px; }
+li:last-child { border-bottom: 0; }
+li.out { opacity: 0; transform: translateX(24px); max-height: 0; min-height: 0; padding-top: 0; padding-bottom: 0; overflow: hidden; }
+.check { flex: none; width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--accent); background: transparent; cursor: pointer;
+  display: grid; place-items: center; color: transparent; font-size: 18px; line-height: 1; padding: 0; }
+.check:hover, .check:focus-visible { background: var(--tint); color: var(--accent); outline: none; }
+.dot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); margin: 0 11px; }
+.txt { flex: 1; min-width: 0; overflow-wrap: anywhere; padding: 10px 0; }
+.txt small { display: block; color: var(--muted); font-size: .75rem; }
+li input[type="text"] { padding: 8px 10px; }
+.swatches { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.swatches small { color: var(--muted); font-size: .8rem; margin-right: 2px; }
+.sw { width: 34px; height: 34px; border-radius: 50%; border: 3px solid var(--surface); background: var(--sc); cursor: pointer; padding: 0; box-shadow: 0 0 0 1px var(--line); }
+.sw.sel { box-shadow: 0 0 0 3px var(--text); }
+.empty { padding: 22px 16px; text-align: center; color: var(--muted); display: block; min-height: 0; }
+.note { text-align: center; color: var(--muted); font-size: .85rem; margin: 6px 0 0; }
+.err { color: var(--danger); }
+.newsec { display: flex; gap: 8px; margin-bottom: 18px; }
+.center { max-width: 460px; margin: 12vh auto 0; text-align: center; }
+.center .card { padding: 24px 20px; margin-bottom: 14px; }
+.center p { color: var(--muted); }
+.steps { text-align: left; font-size: .92rem; color: var(--text); padding-left: 18px; }
+.member { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.member:last-child { border-bottom: 0; }
+.member.pend { background: var(--warnbg); }
+.minfo { flex: 1 1 160px; min-width: 0; }
+.minfo b, .minfo span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.minfo span { color: var(--muted); font-size: .8rem; }
+.member select { flex: 0 0 auto; width: 130px; }
+#toast { position: fixed; left: 50%; transform: translateX(-50%) translateY(20px); bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  background: var(--text); color: var(--bg); padding: 10px 14px; border-radius: 12px; display: flex; align-items: center; gap: 12px;
+  opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; max-width: calc(100% - 32px); font-size: .92rem; }
+#toast.show { opacity: 1; transform: translateX(-50%); pointer-events: auto; }
+#toast button { font: inherit; font-weight: 700; background: none; border: 0; color: inherit; text-decoration: underline; cursor: pointer; padding: 6px; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 16px 12px; }
+.chip { font: inherit; font-size: .92rem; font-weight: 600; border: 1.5px solid var(--accent, var(--text)); color: var(--accent, var(--text)); background: transparent; border-radius: 999px; padding: 8px 14px; min-height: 40px; cursor: pointer; }
+.chip.sel { background: var(--accent, var(--text)); color: var(--surface); }
+.field { padding: 12px 16px 4px; }
+.field label { display: block; font-size: .8rem; color: var(--muted); margin: 0 0 4px; }
+.field input { width: 100%; }
+.tag { display: inline-block; font-size: .7rem; font-weight: 700; padding: 1px 8px; border-radius: 999px; vertical-align: middle; }
+.tag.pend { color: var(--warn); background: var(--warnbg); }
+.tag.ok { color: var(--a2); background: var(--t2); }
+.txt b { font-weight: 700; }
+</style>
+<body>
+<main id="app"></main>
+<div id="toast" role="status"><span id="toast-msg"></span><button type="button" id="toast-undo">Deshacer</button></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+var firebaseConfig = {
+  apiKey: "AIzaSyBJvSbK3lDyxy8yfmMPE_d5l8IpWkMoMfs",
+  authDomain: "faltantes-en-mesita.firebaseapp.com",
+  projectId: "faltantes-en-mesita",
+  appId: "1:678572128455:web:7f148825e41fe082cf66e2"
+};
+
+(function () {
+  var ROLES = { pending: "Pendiente", blocked: "Bloqueado", reader: "Lector", editor: "Editor", admin: "Admin" };
+  var DEFAULT_CATALOG = [
+    { id: "set", name: "Equipo de mate completo" }, { id: "mate", name: "Mate" },
+    { id: "termo", name: "Termo" }, { id: "bombilla", name: "Bombilla" }
+  ];
+  var app = document.getElementById("app");
+  var auth, db, authUser = null, me = null;
+  var loans = [], users = [], catalog = DEFAULT_CATALOG.slice(), loansLoaded = false;
+  var subMe = null, subData = [], activeRole = null, catQueue = Promise.resolve();
+  var view = "ahora", editMode = false, filter = "todos", selected = [], drafts = {}, pendingDel = null, lastReturned = null, toastTimer = null, msg = "";
+
+  function mk(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function clean(v) { return (v || "").trim().replace(/\s+/g, " "); }
+  function isMember() { return me && (me.role === "reader" || me.role === "editor" || me.role === "admin"); }
+  function canWrite() { return me && (me.role === "editor" || me.role === "admin"); }
+  function isAdmin() { return me && me.role === "admin"; }
+  function firstName() { var n = (authUser && (authUser.displayName || authUser.email)) || ""; return n.split(" ")[0]; }
+  function errText(e, fb) { return e && e.code === "permission-denied" ? "No tenés permiso para hacer esto." : fb; }
+  function p2(x) { return ("0" + x).slice(-2); }
+  function fmt(t) { var d = new Date(t); return p2(d.getDate()) + "/" + p2(d.getMonth() + 1) + "/" + d.getFullYear() + " " + p2(d.getHours()) + ":" + p2(d.getMinutes()); }
+  function ago(t) {
+    var a = new Date(t), n = new Date(); a.setHours(0, 0, 0, 0); n.setHours(0, 0, 0, 0);
+    var d = Math.round((n - a) / 86400000);
+    return d <= 0 ? "hoy" : (d === 1 ? "ayer" : "hace " + d + " días");
+  }
+
+  function showToast(text, canUndo) {
+    document.getElementById("toast-msg").textContent = text;
+    document.getElementById("toast-undo").style.display = canUndo ? "" : "none";
+    var t = document.getElementById("toast"); t.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove("show"); lastReturned = null; }, 6000);
+  }
+  document.getElementById("toast-undo").addEventListener("click", function () {
+    if (!lastReturned) return;
+    var id = lastReturned; lastReturned = null;
+    db.collection("loans").doc(id).update({ returnedAt: null, returnedBy: null }).catch(function () { showToast("No se pudo deshacer.", false); });
+    document.getElementById("toast").classList.remove("show");
+  });
+
+  function draftInput(key, value, placeholder, max) {
+    var inp = mk("input"); inp.type = "text"; inp.maxLength = max; inp.autocomplete = "off"; inp.dataset.key = key;
+    if (placeholder) inp.placeholder = placeholder;
+    inp.value = drafts[key] != null ? drafts[key] : value;
+    inp.addEventListener("input", function () { drafts[key] = inp.value; });
+    return inp;
+  }
+
+  /* ---------- datos ---------- */
+  function stopData() { subData.forEach(function (u) { try { u(); } catch (e) {} }); subData = []; loans = []; users = []; catalog = DEFAULT_CATALOG.slice(); loansLoaded = false; }
+  function fail() { msg = "Se perdió la conexión o falta permiso para leer los datos."; render(); }
+  function startData(role) {
+    if (role === "reader" || role === "editor" || role === "admin") {
+      subData.push(db.collection("config").doc("catalog").onSnapshot(function (d) {
+        var v = d.exists ? d.data() : null;
+        catalog = v && Array.isArray(v.list) && v.list.length ? v.list.map(function (x) { return { id: String(x.id), name: String(x.name || "") }; }) : DEFAULT_CATALOG.slice();
+        render();
+      }, function () {}));
+      subData.push(db.collection("loans").orderBy("lentAt", "desc").limit(500).onSnapshot(function (s) {
+        loans = s.docs.map(function (d) {
+          var v = d.data();
+          return { id: d.id, itemName: String(v.itemName || ""), borrower: String(v.borrower || ""), note: String(v.note || ""), lentAt: v.lentAt || 0,
+                   lentBy: String(v.lentBy || ""), returnedAt: v.returnedAt || null, returnedBy: String(v.returnedBy || "") };
+        });
+        loansLoaded = true; msg = ""; render();
+      }, fail));
+    }
+    if (role === "admin") {
+      subData.push(db.collection("users").onSnapshot(function (s) {
+        users = s.docs.map(function (d) { var v = d.data(); return { uid: d.id, name: String(v.name || ""), email: String(v.email || ""), role: String(v.role || "pending"), createdAt: v.createdAt || 0 }; });
+        render();
+      }, function () {}));
+    }
+  }
+
+  function init() {
+    firebase.initializeApp(firebaseConfig);
+    auth = firebase.auth(); db = firebase.firestore();
+    auth.onAuthStateChanged(function (u) {
+      if (subMe) { subMe(); subMe = null; }
+      stopData(); activeRole = null; me = null; authUser = u; view = "ahora"; editMode = false;
+      if (!u) { render(); return; }
+      render();
+      var ref = db.collection("users").doc(u.uid);
+      ref.get().then(function (snap) {
+        if (snap.exists) return;
+        return ref.set({ name: u.displayName || "", email: u.email || "", role: "pending", createdAt: Date.now() });
+      }).then(function () {
+        subMe = ref.onSnapshot(function (snap) {
+          me = snap.exists ? snap.data() : { role: "pending" };
+          if (me.role !== activeRole) { stopData(); activeRole = me.role; startData(me.role); }
+          render();
+        }, function () { msg = "No se pudo leer tu perfil. Revisá tu conexión."; render(); });
+      }).catch(function () { msg = "No se pudo iniciar. Revisá la configuración de Firebase y las reglas."; render(); });
+    });
+  }
+  function signIn() {
+    var p = new firebase.auth.GoogleAuthProvider();
+    auth.signInWithPopup(p).catch(function (e) {
+      if (e && (e.code === "auth/popup-blocked" || e.code === "auth/operation-not-supported-in-this-environment")) auth.signInWithRedirect(p);
+      else if (e && e.code === "auth/unauthorized-domain") { msg = "Este dominio no está autorizado en Firebase (Authentication > Configuración > Dominios autorizados)."; render(); }
+      else if (!e || e.code !== "auth/popup-closed-by-user") { msg = "No se pudo iniciar sesión" + (e && e.code ? " (" + e.code + ")" : "") + "."; render(); }
+    });
+  }
+
+  /* ---------- acciones ---------- */
+  function registerLoan() {
+    var who = clean(drafts.borrower), note = clean(drafts.note), custom = clean(drafts.custom);
+    if (custom && selected.indexOf(custom) < 0) selected.push(custom);
+    if (!who) { showToast("Escribí a quién se lo prestás.", false); return; }
+    if (!selected.length) { showToast("Elegí qué cosa(s) prestás.", false); return; }
+    var now = Date.now(), batch = db.batch(), names = selected.slice();
+    names.forEach(function (name, i) {
+      var d = { itemName: name, borrower: who, lentAt: now + i, lentBy: firstName(), returnedAt: null };
+      if (note) d.note = note;
+      batch.set(db.collection("loans").doc(), d);
+    });
+    batch.commit().then(function () {
+      selected = []; delete drafts.borrower; delete drafts.note; delete drafts.custom;
+      showToast("Registrado: " + names.join(", ") + " → " + who, false); render();
+    }).catch(function (e) { showToast(errText(e, "No se pudo registrar. Probá de nuevo."), false); });
+  }
+  function returnLoan(l, li) {
+    li.classList.add("out");
+    setTimeout(function () {
+      db.collection("loans").doc(l.id).update({ returnedAt: Date.now(), returnedBy: firstName() }).then(function () {
+        lastReturned = l.id; showToast("Devuelto: " + l.itemName + " (" + l.borrower + ")", true);
+      }).catch(function (e) { li.classList.remove("out"); showToast(errText(e, "No se pudo marcar."), false); });
+    }, 250);
+  }
+  function editCatalog(fn) {
+    catQueue = catQueue.then(function () {
+      var next = fn(catalog.map(function (c) { return { id: c.id, name: c.name }; }));
+      catalog = next;
+      return db.collection("config").doc("catalog").set({ list: next });
+    }).catch(function (e) { msg = errText(e, "No se pudo guardar el cambio."); render(); });
+    return catQueue;
+  }
+  function csvCell(v) { v = String(v == null ? "" : v); return /[",;\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
+  function downloadCsv() {
+    var rows = [["Cosa", "Persona", "Prestado", "Devuelto", "Anotó el préstamo", "Recibió la devolución", "Nota"]];
+    loans.forEach(function (l) { rows.push([l.itemName, l.borrower, fmt(l.lentAt), l.returnedAt ? fmt(l.returnedAt) : "Sin devolver", l.lentBy, l.returnedBy, l.note]); });
+    var csv = "\ufeff" + rows.map(function (r) { return r.map(csvCell).join(","); }).join("\n");
+    var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    a.download = "registro-prestamos.csv"; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  }
+
+  /* ---------- pantallas ---------- */
+  function render() {
+    var ae = document.activeElement, fk = null, fs = 0, fe = 0;
+    if (ae && ae.dataset && ae.dataset.key) { fk = ae.dataset.key; fs = ae.selectionStart; fe = ae.selectionEnd; }
+    app.textContent = "";
+    if (!authUser) loginScreen();
+    else if (!me) centerScreen("Cargando…", "", true);
+    else if (me.role === "pending") centerScreen("Esperando aprobación", "Tu cuenta (" + (authUser.email || "") + ") fue registrada. Un administrador tiene que admitirte antes de que puedas ver el registro. Volvé a entrar más tarde.", true);
+    else if (me.role === "blocked") centerScreen("Acceso denegado", "Un administrador no habilitó tu acceso a esta página.", true);
+    else appScreen();
+    if (fk) {
+      var el = document.querySelector('input[data-key="' + fk.replace(/"/g, '\\"') + '"]');
+      if (el) { el.focus(); try { el.setSelectionRange(fs, fe); } catch (x) {} }
+    }
+  }
+  function loginScreen() {
+    var w = mk("div", "center"), c = mk("div", "card");
+    c.appendChild(mk("h1", null, "Préstamos de la mesita"));
+    c.appendChild(mk("p", null, "Iniciá sesión con tu cuenta de Google. Si es tu primera vez, un administrador tendrá que admitirte."));
+    var b = mk("button", "btn primary", "Entrar con Google"); b.type = "button"; b.addEventListener("click", signIn);
+    c.appendChild(b); w.appendChild(c);
+    if (msg) w.appendChild(mk("p", "note err", msg));
+    app.appendChild(w);
+  }
+  function centerScreen(title, text, withOut) {
+    var w = mk("div", "center"), c = mk("div", "card");
+    c.appendChild(mk("h1", null, title));
+    if (text) c.appendChild(mk("p", null, text));
+    if (withOut) { var b = mk("button", "btn", "Cerrar sesión"); b.type = "button"; b.addEventListener("click", function () { auth.signOut(); }); c.appendChild(b); }
+    w.appendChild(c);
+    if (msg) w.appendChild(mk("p", "note err", msg));
+    app.appendChild(w);
+  }
+
+  function appScreen() {
+    var open = loans.filter(function (l) { return !l.returnedAt; });
+    var top = mk("div", "top"), l = mk("div");
+    l.appendChild(mk("h1", null, "Préstamos de la mesita"));
+    l.appendChild(mk("p", "sub", canWrite()
+      ? "Anotá qué prestás y a quién. Cuando lo devuelven, tocá el círculo ✓ y queda guardado en el registro."
+      : "Estás en modo lectura. Pedile a un admin que te dé permiso de editor."));
+    var r = mk("div", "me"); r.appendChild(mk("b", null, firstName())); r.appendChild(mk("span", "role", ROLES[me.role] || me.role));
+    var out = mk("button", "btn", "Salir"); out.type = "button"; out.style.minHeight = "36px"; out.style.display = "block"; out.style.marginLeft = "auto";
+    out.addEventListener("click", function () { auth.signOut(); }); r.appendChild(out);
+    top.appendChild(l); top.appendChild(r); app.appendChild(top);
+
+    var bar = mk("div", "bar");
+    var tab = function (label, v, badge) {
+      var b = mk("button", "btn" + (view === v ? " on" : ""), label); b.type = "button";
+      if (badge) b.appendChild(mk("span", "badge", String(badge)));
+      b.addEventListener("click", function () { view = v; if (v !== "ahora") editMode = false; render(); });
+      return b;
+    };
+    bar.appendChild(tab("Prestado ahora", "ahora", open.length));
+    bar.appendChild(tab("Registro", "registro", 0));
+    if (isAdmin()) {
+      var pend = users.filter(function (u) { return u.role === "pending"; }).length;
+      bar.appendChild(tab("Integrantes", "miembros", pend));
+      if (view === "ahora") {
+        var te = mk("button", "btn" + (editMode ? " on" : ""), editMode ? "✓ Salir del modo admin" : "⚙ Modo admin"); te.type = "button";
+        te.addEventListener("click", function () { editMode = !editMode; render(); });
+        bar.appendChild(te);
+      }
+    }
+    app.appendChild(bar);
+    if (view === "registro") recordView();
+    else if (view === "miembros" && isAdmin()) membersView();
+    else nowView(open);
+    if (msg) app.appendChild(mk("p", "note err", msg));
+  }
+
+  function newLoanCard() {
+    var card = mk("section", "card"); card.style.setProperty("--accent", "var(--a2)"); card.style.setProperty("--tint", "var(--t2)");
+    var head = mk("div", "card-head"); head.appendChild(mk("h2", null, "Nuevo préstamo")); card.appendChild(head);
+
+    var f1 = mk("div", "field"); f1.appendChild(mk("label", null, "¿A quién se lo prestás?"));
+    var bi = draftInput("borrower", "", "Nombre de la persona", 60); bi.setAttribute("list", "borrowers"); f1.appendChild(bi);
+    var dl = mk("datalist"); dl.id = "borrowers"; var seen = {};
+    loans.forEach(function (x) { var k = x.borrower.toLowerCase(); if (!seen[k] && Object.keys(seen).length < 40) { seen[k] = 1; var o = mk("option"); o.value = x.borrower; dl.appendChild(o); } });
+    f1.appendChild(dl); card.appendChild(f1);
+
+    var f2 = mk("div", "field"); f2.appendChild(mk("label", null, "¿Qué prestás? (podés elegir varias)")); card.appendChild(f2);
+    var chips = mk("div", "chips");
+    var names = catalog.map(function (c) { return c.name; });
+    selected.forEach(function (n) { if (names.indexOf(n) < 0) names.push(n); });
+    names.forEach(function (n) {
+      var c = mk("button", "chip" + (selected.indexOf(n) >= 0 ? " sel" : ""), n); c.type = "button";
+      c.addEventListener("click", function () { var i = selected.indexOf(n); if (i >= 0) selected.splice(i, 1); else selected.push(n); render(); });
+      chips.appendChild(c);
+    });
+    card.appendChild(chips);
+
+    var f3 = mk("div", "add"); f3.style.borderBottom = "0"; f3.style.paddingTop = "0";
+    var ci = draftInput("custom", "", "Otra cosa (ej. cargador, vasos…)", 60);
+    var cb = mk("button", null, "+ Sumar"); cb.type = "button";
+    var addCustom = function () { var v = clean(drafts.custom); if (!v) return; if (selected.indexOf(v) < 0) selected.push(v); delete drafts.custom; render(); };
+    cb.addEventListener("click", addCustom);
+    ci.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); addCustom(); } });
+    f3.appendChild(ci); f3.appendChild(cb); card.appendChild(f3);
+
+    var f4 = mk("div", "field"); f4.style.paddingBottom = "12px"; f4.appendChild(mk("label", null, "Nota (opcional)"));
+    f4.appendChild(draftInput("note", "", "ej. lo devuelve el viernes", 120)); card.appendChild(f4);
+
+    var f5 = mk("div"); f5.style.padding = "0 16px 16px";
+    var go = mk("button", "btn primary", "Registrar préstamo"); go.type = "button"; go.addEventListener("click", registerLoan);
+    f5.appendChild(go); card.appendChild(f5);
+    return card;
+  }
+
+  function catalogCard() {
+    var card = mk("section", "card"); card.style.setProperty("--accent", "var(--a3)"); card.style.setProperty("--tint", "var(--t3)");
+    var head = mk("div", "card-head"); head.appendChild(mk("h2", null, "Cosas para prestar (atajos)")); card.appendChild(head);
+    var ul = mk("ul");
+    catalog.forEach(function (c) {
+      var li = mk("li");
+      var ni = draftInput("cat:" + c.id, c.name, "Nombre", 60);
+      ni.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); ni.blur(); } });
+      ni.addEventListener("change", function () {
+        var v = clean(ni.value); delete drafts["cat:" + c.id];
+        if (!v || v === c.name) { render(); return; }
+        editCatalog(function (list) { return list.map(function (x) { if (x.id === c.id) x.name = v; return x; }); }).then(render);
+      });
+      var del = mk("button", "btn danger", pendingDel === c.id ? "¿Seguro?" : "Quitar"); del.type = "button";
+      del.addEventListener("click", function () {
+        if (pendingDel !== c.id) { pendingDel = c.id; render(); return; }
+        pendingDel = null;
+        editCatalog(function (list) { return list.filter(function (x) { return x.id !== c.id; }); }).then(render);
+      });
+      li.appendChild(ni); li.appendChild(del); ul.appendChild(li);
+    });
+    card.appendChild(ul);
+    var add = mk("div", "add"); add.style.borderTop = "1px solid var(--line)"; add.style.borderBottom = "0";
+    var ni2 = draftInput("cat:new", "", "Nueva cosa para prestar", 60);
+    var b = mk("button", null, "Agregar"); b.type = "button";
+    var goC = function () {
+      var v = clean(drafts["cat:new"]); if (!v) return; delete drafts["cat:new"];
+      editCatalog(function (list) { list.push({ id: "c" + Date.now().toString(36), name: v }); return list; }).then(render);
+    };
+    b.addEventListener("click", goC);
+    ni2.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); goC(); } });
+    add.appendChild(ni2); add.appendChild(b); card.appendChild(add);
+    return card;
+  }
+
+  function nowView(open) {
+    if (canWrite()) app.appendChild(newLoanCard());
+    if (editMode && isAdmin()) app.appendChild(catalogCard());
+    var card = mk("section", "card"); card.style.setProperty("--accent", "var(--a0)"); card.style.setProperty("--tint", "var(--t0)");
+    var head = mk("div", "card-head"); head.appendChild(mk("h2", null, "Prestado ahora")); head.appendChild(mk("span", "count", String(open.length))); card.appendChild(head);
+    var ul = mk("ul");
+    if (loansLoaded && !open.length) ul.appendChild(mk("li", "empty", "No hay nada prestado ✓"));
+    open.forEach(function (l) {
+      var li = mk("li");
+      if (canWrite()) {
+        var b = mk("button", "check", "✓"); b.type = "button"; b.setAttribute("aria-label", "Marcar como devuelto: " + l.itemName + " (" + l.borrower + ")");
+        b.addEventListener("click", function () { returnLoan(l, li); });
+        li.appendChild(b);
+      } else li.appendChild(mk("span", "dot"));
+      var tx = mk("span", "txt"); var strong = mk("b", null, l.itemName); tx.appendChild(strong); tx.appendChild(document.createTextNode(" → " + l.borrower));
+      tx.appendChild(mk("small", null, "Prestado " + ago(l.lentAt) + " (" + fmt(l.lentAt) + ")" + (l.lentBy ? " · anotó " + l.lentBy : "")));
+      if (l.note) tx.appendChild(mk("small", null, "📝 " + l.note));
+      li.appendChild(tx); ul.appendChild(li);
+    });
+    card.appendChild(ul); app.appendChild(card);
+  }
+
+  function recordView() {
+    var card = mk("section", "card"); card.style.setProperty("--accent", "var(--a1)"); card.style.setProperty("--tint", "var(--t1)");
+    var head = mk("div", "card-head"); head.appendChild(mk("h2", null, "Registro"));
+    head.appendChild(mk("span", "count", loans.length + (loans.length >= 500 ? "+" : ""))); card.appendChild(head);
+
+    var tools = mk("div", "add"); tools.style.flexWrap = "wrap";
+    var q = draftInput("q", "", "Buscar persona o cosa…", 60); q.addEventListener("input", function () { render(); });
+    tools.appendChild(q);
+    var dl = mk("button", "btn", "⬇ CSV"); dl.type = "button"; dl.style.background = "var(--surface)"; dl.style.color = "var(--text)"; dl.addEventListener("click", downloadCsv);
+    tools.appendChild(dl); card.appendChild(tools);
+
+    var seg = mk("div", "chips"); seg.style.paddingTop = "12px";
+    [["todos", "Todos"], ["pend", "Sin devolver"], ["dev", "Devueltos"]].forEach(function (o) {
+      var c = mk("button", "chip" + (filter === o[0] ? " sel" : ""), o[1]); c.type = "button";
+      c.addEventListener("click", function () { filter = o[0]; render(); }); seg.appendChild(c);
+    });
+    card.appendChild(seg);
+
+    var term = clean(drafts.q).toLowerCase();
+    var list = loans.filter(function (l) {
+      if (filter === "pend" && l.returnedAt) return false;
+      if (filter === "dev" && !l.returnedAt) return false;
+      return !term || l.itemName.toLowerCase().indexOf(term) >= 0 || l.borrower.toLowerCase().indexOf(term) >= 0;
+    });
+    var ul = mk("ul");
+    if (loansLoaded && !list.length) ul.appendChild(mk("li", "empty", loans.length ? "Nada coincide con la búsqueda." : "Todavía no hay préstamos registrados."));
+    list.forEach(function (l) {
+      var li = mk("li"); li.style.padding = "10px 16px";
+      var tx = mk("span", "txt"); tx.style.padding = "0";
+      var strong = mk("b", null, l.itemName); tx.appendChild(strong); tx.appendChild(document.createTextNode(" → " + l.borrower + " "));
+      tx.appendChild(mk("span", "tag " + (l.returnedAt ? "ok" : "pend"), l.returnedAt ? "Devuelto" : "Sin devolver"));
+      tx.appendChild(mk("small", null, "Prestado: " + fmt(l.lentAt) + (l.lentBy ? " · anotó " + l.lentBy : "")));
+      if (l.returnedAt) tx.appendChild(mk("small", null, "Devuelto: " + fmt(l.returnedAt) + (l.returnedBy ? " · recibió " + l.returnedBy : "")));
+      if (l.note) tx.appendChild(mk("small", null, "📝 " + l.note));
+      li.appendChild(tx);
+      if (canWrite() && l.returnedAt) {
+        var re = mk("button", "btn", "Reabrir"); re.type = "button"; re.style.minHeight = "36px";
+        re.addEventListener("click", function () { db.collection("loans").doc(l.id).update({ returnedAt: null, returnedBy: null }).catch(function (e) { showToast(errText(e, "No se pudo reabrir."), false); }); });
+        li.appendChild(re);
+      }
+      if (isAdmin()) {
+        var del = mk("button", "btn danger", pendingDel === l.id ? "¿Seguro?" : "✕"); del.type = "button"; del.style.minHeight = "36px";
+        del.addEventListener("click", function () {
+          if (pendingDel !== l.id) { pendingDel = l.id; render(); return; }
+          pendingDel = null; db.collection("loans").doc(l.id).delete().catch(function (e) { showToast(errText(e, "No se pudo borrar."), false); });
+        });
+        li.appendChild(del);
+      }
+      ul.appendChild(li);
+    });
+    card.appendChild(ul); app.appendChild(card);
+  }
+
+  function membersView() {
+    var card = mk("section", "card"); card.style.setProperty("--accent", "var(--a1)"); card.style.setProperty("--tint", "var(--t1)");
+    var head = mk("div", "card-head"); head.appendChild(mk("h2", null, "Integrantes")); head.appendChild(mk("span", "count", String(users.length))); card.appendChild(head);
+    var order = { pending: 0, blocked: 3, reader: 2, editor: 2, admin: 1 };
+    var list = users.slice().sort(function (a, b) { return (order[a.role] - order[b.role]) || a.name.localeCompare(b.name); });
+    list.forEach(function (u) {
+      var row = mk("div", "member" + (u.role === "pending" ? " pend" : ""));
+      var info = mk("div", "minfo"); info.appendChild(mk("b", null, u.name || u.email)); info.appendChild(mk("span", null, u.email)); row.appendChild(info);
+      var sel = mk("select");
+      ["pending", "reader", "editor", "admin", "blocked"].forEach(function (r) { var o = mk("option", null, ROLES[r]); o.value = r; if (r === u.role) o.selected = true; sel.appendChild(o); });
+      if (u.uid === authUser.uid) sel.disabled = true;
+      sel.addEventListener("change", function () { db.collection("users").doc(u.uid).update({ role: sel.value }).catch(function (e) { msg = errText(e, "No se pudo cambiar el rol."); render(); }); });
+      row.appendChild(sel); card.appendChild(row);
+    });
+    if (!list.length) card.appendChild(mk("div", "empty", "Todavía no hay nadie."));
+    app.appendChild(card);
+    app.appendChild(mk("p", "note", "Los roles son los mismos que en la página de faltantes: se comparten entre las dos."));
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
