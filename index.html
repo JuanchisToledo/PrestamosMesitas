@@ -113,6 +113,7 @@ li input[type="text"] { padding: 8px 10px; }
 .tag.pend { color: var(--warn); background: var(--warnbg); }
 .tag.ok { color: var(--a2); background: var(--t2); }
 .txt b { font-weight: 700; }
+.mtag { display: inline-block; font-size: .7rem; font-weight: 700; padding: 1px 8px; border-radius: 999px; color: var(--accent, var(--muted)); background: var(--tint, var(--bg)); margin: 0 6px 2px 0; vertical-align: middle; }
 </style>
 <body>
 <main id="app"></main>
@@ -135,9 +136,12 @@ var firebaseConfig = {
     { id: "set", name: "Equipo de mate completo" }, { id: "mate", name: "Mate" },
     { id: "termo", name: "Termo" }, { id: "bombilla", name: "Bombilla" }
   ];
+  var DEFAULT_MESITAS = [{ id: "civil", name: "Mesita de Civil", color: 0 }, { id: "electro", name: "Mesita de Electromecánica y Mecánica", color: 1 }];
   var app = document.getElementById("app");
   var auth, db, authUser = null, me = null;
   var loans = [], users = [], catalog = DEFAULT_CATALOG.slice(), loansLoaded = false;
+  var mesitas = DEFAULT_MESITAS.slice(), mfilter = "todas", mesitaSel = "";
+  try { mesitaSel = localStorage.getItem("lastMesita") || ""; } catch (e) {}
   var subMe = null, subData = [], activeRole = null, catQueue = Promise.resolve();
   var view = "ahora", editMode = false, filter = "todos", selected = [], drafts = {}, pendingDel = null, lastReturned = null, toastTimer = null, msg = "";
 
@@ -179,7 +183,7 @@ var firebaseConfig = {
   }
 
   /* ---------- datos ---------- */
-  function stopData() { subData.forEach(function (u) { try { u(); } catch (e) {} }); subData = []; loans = []; users = []; catalog = DEFAULT_CATALOG.slice(); loansLoaded = false; }
+  function stopData() { subData.forEach(function (u) { try { u(); } catch (e) {} }); subData = []; loans = []; users = []; catalog = DEFAULT_CATALOG.slice(); mesitas = DEFAULT_MESITAS.slice(); loansLoaded = false; }
   function fail() { msg = "Se perdió la conexión o falta permiso para leer los datos."; render(); }
   function startData(role) {
     if (role === "reader" || role === "editor" || role === "admin") {
@@ -188,10 +192,15 @@ var firebaseConfig = {
         catalog = v && Array.isArray(v.list) && v.list.length ? v.list.map(function (x) { return { id: String(x.id), name: String(x.name || "") }; }) : DEFAULT_CATALOG.slice();
         render();
       }, function () {}));
+      subData.push(db.collection("config").doc("mesitas").onSnapshot(function (d) {
+        var v = d.exists ? d.data() : null;
+        mesitas = v && Array.isArray(v.list) && v.list.length ? v.list.map(function (x) { return { id: String(x.id), name: String(x.name || ""), color: x.color }; }) : DEFAULT_MESITAS.slice();
+        render();
+      }, function () {}));
       subData.push(db.collection("loans").orderBy("lentAt", "desc").limit(500).onSnapshot(function (s) {
         loans = s.docs.map(function (d) {
           var v = d.data();
-          return { id: d.id, itemName: String(v.itemName || ""), borrower: String(v.borrower || ""), note: String(v.note || ""), lentAt: v.lentAt || 0,
+          return { id: d.id, itemName: String(v.itemName || ""), borrower: String(v.borrower || ""), note: String(v.note || ""), mesita: String(v.mesita || ""), lentAt: v.lentAt || 0,
                    lentBy: String(v.lentBy || ""), returnedAt: v.returnedAt || null, returnedBy: String(v.returnedBy || "") };
         });
         loansLoaded = true; msg = ""; render();
@@ -239,11 +248,12 @@ var firebaseConfig = {
   function registerLoan() {
     var who = clean(drafts.borrower), note = clean(drafts.note), custom = clean(drafts.custom);
     if (custom && selected.indexOf(custom) < 0) selected.push(custom);
+    if (!mesitaSel) { showToast("Elegí en qué mesita se presta.", false); return; }
     if (!who) { showToast("Escribí a quién se lo prestás.", false); return; }
     if (!selected.length) { showToast("Elegí qué cosa(s) prestás.", false); return; }
     var now = Date.now(), batch = db.batch(), names = selected.slice();
     names.forEach(function (name, i) {
-      var d = { itemName: name, borrower: who, lentAt: now + i, lentBy: firstName(), returnedAt: null };
+      var d = { itemName: name, borrower: who, mesita: mesitaSel, lentAt: now + i, lentBy: firstName(), returnedAt: null };
       if (note) d.note = note;
       batch.set(db.collection("loans").doc(), d);
     });
@@ -268,10 +278,72 @@ var firebaseConfig = {
     }).catch(function (e) { msg = errText(e, "No se pudo guardar el cambio."); render(); });
     return catQueue;
   }
+  function mesitaInfo(id) {
+    for (var i = 0; i < mesitas.length; i++) if (mesitas[i].id === id) {
+      var c = mesitas[i].color;
+      return { id: id, name: mesitas[i].name, k: (typeof c === "number" && c >= 0 && c < 8) ? c : (i % 4) };
+    }
+    return null;
+  }
+  function mesitaLabel(id) { var m = mesitaInfo(id); return m ? m.name : "Sin indicar"; }
+  function editMesitas(fn) {
+    catQueue = catQueue.then(function () {
+      var next = fn(mesitas.map(function (m) { return { id: m.id, name: m.name, color: m.color }; }));
+      next = next.map(function (m) { var o = { id: m.id, name: m.name }; if (typeof m.color === "number") o.color = m.color; return o; });
+      mesitas = next;
+      return db.collection("config").doc("mesitas").set({ list: next });
+    }).catch(function (e) { msg = errText(e, "No se pudo guardar el cambio."); render(); });
+    return catQueue;
+  }
+  function mtag(id) {
+    var info = mesitaInfo(id), t = mk("span", "mtag", info ? info.name : "Sin mesita");
+    if (info) { t.style.setProperty("--accent", "var(--a" + info.k + ")"); t.style.setProperty("--tint", "var(--t" + info.k + ")"); }
+    return t;
+  }
+  function styleRow(li, l) {
+    var info = mesitaInfo(l.mesita);
+    if (info) { li.style.setProperty("--accent", "var(--a" + info.k + ")"); li.style.setProperty("--tint", "var(--t" + info.k + ")"); li.style.borderLeft = "4px solid var(--a" + info.k + ")"; }
+  }
+  function mfilterFn(l) { return mfilter === "todas" || l.mesita === mfilter; }
+  function mesitaChips() {
+    var seg = mk("div", "chips"); seg.style.paddingTop = "12px";
+    [["todas", "Todas"]].concat(mesitas.map(function (m) { return [m.id, m.name]; })).forEach(function (o) {
+      var info = mesitaInfo(o[0]), c = mk("button", "chip" + (mfilter === o[0] ? " sel" : ""), o[1]); c.type = "button";
+      if (info) c.style.setProperty("--accent", "var(--a" + info.k + ")");
+      c.addEventListener("click", function () { mfilter = o[0]; render(); });
+      seg.appendChild(c);
+    });
+    return seg;
+  }
+  function mesitasCard() {
+    var card = mk("section", "card"); card.style.setProperty("--accent", "var(--a3)"); card.style.setProperty("--tint", "var(--t3)");
+    var head = mk("div", "card-head"); head.appendChild(mk("h2", null, "Mesitas y colores")); card.appendChild(head);
+    mesitas.forEach(function (m) {
+      var info = mesitaInfo(m.id), box = mk("div"); box.style.borderBottom = "1px solid var(--line)";
+      var row = mk("div", "add"); row.style.borderBottom = "0";
+      var ni = draftInput("mes:" + m.id, m.name, "Nombre de la mesita", 60);
+      ni.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); ni.blur(); } });
+      ni.addEventListener("change", function () {
+        var v = clean(ni.value); delete drafts["mes:" + m.id];
+        if (!v || v === m.name) { render(); return; }
+        editMesitas(function (list) { return list.map(function (x) { if (x.id === m.id) x.name = v; return x; }); }).then(render);
+      });
+      row.appendChild(ni); box.appendChild(row);
+      var sws = mk("div", "swatches"); sws.style.borderBottom = "0"; sws.style.paddingTop = "0"; sws.appendChild(mk("small", null, "Color:"));
+      for (var n = 0; n < 8; n++) (function (n) {
+        var sw = mk("button", "sw" + (n === info.k ? " sel" : "")); sw.type = "button";
+        sw.style.setProperty("--sc", "var(--a" + n + ")"); sw.setAttribute("aria-label", "Elegir color " + (n + 1));
+        sw.addEventListener("click", function () { editMesitas(function (list) { return list.map(function (x) { if (x.id === m.id) x.color = n; return x; }); }).then(render); });
+        sws.appendChild(sw);
+      })(n);
+      box.appendChild(sws); card.appendChild(box);
+    });
+    return card;
+  }
   function csvCell(v) { v = String(v == null ? "" : v); return /[",;\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
   function downloadCsv() {
-    var rows = [["Cosa", "Persona", "Prestado", "Devuelto", "Anotó el préstamo", "Recibió la devolución", "Nota"]];
-    loans.forEach(function (l) { rows.push([l.itemName, l.borrower, fmt(l.lentAt), l.returnedAt ? fmt(l.returnedAt) : "Sin devolver", l.lentBy, l.returnedBy, l.note]); });
+    var rows = [["Mesita", "Cosa", "Persona", "Prestado", "Devuelto", "Anotó el préstamo", "Recibió la devolución", "Nota"]];
+    loans.forEach(function (l) { rows.push([mesitaLabel(l.mesita), l.itemName, l.borrower, fmt(l.lentAt), l.returnedAt ? fmt(l.returnedAt) : "Sin devolver", l.lentBy, l.returnedBy, l.note]); });
     var csv = "\ufeff" + rows.map(function (r) { return r.map(csvCell).join(","); }).join("\n");
     var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     a.download = "registro-prestamos.csv"; document.body.appendChild(a); a.click(); a.remove();
@@ -350,8 +422,20 @@ var firebaseConfig = {
   }
 
   function newLoanCard() {
-    var card = mk("section", "card"); card.style.setProperty("--accent", "var(--a2)"); card.style.setProperty("--tint", "var(--t2)");
+    var sel = mesitaInfo(mesitaSel);
+    var card = mk("section", "card");
+    card.style.setProperty("--accent", sel ? "var(--a" + sel.k + ")" : "var(--a2)"); card.style.setProperty("--tint", sel ? "var(--t" + sel.k + ")" : "var(--t2)");
     var head = mk("div", "card-head"); head.appendChild(mk("h2", null, "Nuevo préstamo")); card.appendChild(head);
+
+    var fm = mk("div", "field"); fm.appendChild(mk("label", null, "¿En qué mesita?")); card.appendChild(fm);
+    var mc = mk("div", "chips");
+    mesitas.forEach(function (m) {
+      var info = mesitaInfo(m.id), c = mk("button", "chip" + (mesitaSel === m.id ? " sel" : ""), m.name); c.type = "button";
+      c.style.setProperty("--accent", "var(--a" + info.k + ")");
+      c.addEventListener("click", function () { mesitaSel = m.id; try { localStorage.setItem("lastMesita", m.id); } catch (e) {} render(); });
+      mc.appendChild(c);
+    });
+    card.appendChild(mc);
 
     var f1 = mk("div", "field"); f1.appendChild(mk("label", null, "¿A quién se lo prestás?"));
     var bi = draftInput("borrower", "", "Nombre de la persona", 60); bi.setAttribute("list", "borrowers"); f1.appendChild(bi);
@@ -424,19 +508,21 @@ var firebaseConfig = {
 
   function nowView(open) {
     if (canWrite()) app.appendChild(newLoanCard());
-    if (editMode && isAdmin()) app.appendChild(catalogCard());
+    if (editMode && isAdmin()) { app.appendChild(mesitasCard()); app.appendChild(catalogCard()); }
     var card = mk("section", "card"); card.style.setProperty("--accent", "var(--a0)"); card.style.setProperty("--tint", "var(--t0)");
     var head = mk("div", "card-head"); head.appendChild(mk("h2", null, "Prestado ahora")); head.appendChild(mk("span", "count", String(open.length))); card.appendChild(head);
+    card.appendChild(mesitaChips());
+    var shown = open.filter(mfilterFn);
     var ul = mk("ul");
-    if (loansLoaded && !open.length) ul.appendChild(mk("li", "empty", "No hay nada prestado ✓"));
-    open.forEach(function (l) {
-      var li = mk("li");
+    if (loansLoaded && !shown.length) ul.appendChild(mk("li", "empty", open.length ? "No hay nada prestado en esta mesita ✓" : "No hay nada prestado ✓"));
+    shown.forEach(function (l) {
+      var li = mk("li"); styleRow(li, l);
       if (canWrite()) {
         var b = mk("button", "check", "✓"); b.type = "button"; b.setAttribute("aria-label", "Marcar como devuelto: " + l.itemName + " (" + l.borrower + ")");
         b.addEventListener("click", function () { returnLoan(l, li); });
         li.appendChild(b);
       } else li.appendChild(mk("span", "dot"));
-      var tx = mk("span", "txt"); var strong = mk("b", null, l.itemName); tx.appendChild(strong); tx.appendChild(document.createTextNode(" → " + l.borrower));
+      var tx = mk("span", "txt"); tx.appendChild(mtag(l.mesita)); var strong = mk("b", null, l.itemName); tx.appendChild(strong); tx.appendChild(document.createTextNode(" → " + l.borrower));
       tx.appendChild(mk("small", null, "Prestado " + ago(l.lentAt) + " (" + fmt(l.lentAt) + ")" + (l.lentBy ? " · anotó " + l.lentBy : "")));
       if (l.note) tx.appendChild(mk("small", null, "📝 " + l.note));
       li.appendChild(tx); ul.appendChild(li);
@@ -461,24 +547,35 @@ var firebaseConfig = {
       c.addEventListener("click", function () { filter = o[0]; render(); }); seg.appendChild(c);
     });
     card.appendChild(seg);
+    card.appendChild(mesitaChips());
 
     var term = clean(drafts.q).toLowerCase();
     var list = loans.filter(function (l) {
       if (filter === "pend" && l.returnedAt) return false;
       if (filter === "dev" && !l.returnedAt) return false;
-      return !term || l.itemName.toLowerCase().indexOf(term) >= 0 || l.borrower.toLowerCase().indexOf(term) >= 0;
+      if (!mfilterFn(l)) return false;
+      return !term || l.itemName.toLowerCase().indexOf(term) >= 0 || l.borrower.toLowerCase().indexOf(term) >= 0 || mesitaLabel(l.mesita).toLowerCase().indexOf(term) >= 0;
     });
     var ul = mk("ul");
     if (loansLoaded && !list.length) ul.appendChild(mk("li", "empty", loans.length ? "Nada coincide con la búsqueda." : "Todavía no hay préstamos registrados."));
     list.forEach(function (l) {
-      var li = mk("li"); li.style.padding = "10px 16px";
-      var tx = mk("span", "txt"); tx.style.padding = "0";
+      var li = mk("li"); li.style.padding = "10px 16px"; styleRow(li, l);
+      var tx = mk("span", "txt"); tx.style.padding = "0"; tx.appendChild(mtag(l.mesita));
       var strong = mk("b", null, l.itemName); tx.appendChild(strong); tx.appendChild(document.createTextNode(" → " + l.borrower + " "));
       tx.appendChild(mk("span", "tag " + (l.returnedAt ? "ok" : "pend"), l.returnedAt ? "Devuelto" : "Sin devolver"));
       tx.appendChild(mk("small", null, "Prestado: " + fmt(l.lentAt) + (l.lentBy ? " · anotó " + l.lentBy : "")));
       if (l.returnedAt) tx.appendChild(mk("small", null, "Devuelto: " + fmt(l.returnedAt) + (l.returnedBy ? " · recibió " + l.returnedBy : "")));
       if (l.note) tx.appendChild(mk("small", null, "📝 " + l.note));
       li.appendChild(tx);
+      if (!l.mesita && canWrite()) {
+        var ms = mk("select"); ms.style.cssText = "flex:0 0 auto;width:140px;padding:6px 8px";
+        var o0 = mk("option", null, "¿Qué mesita?"); o0.value = ""; ms.appendChild(o0);
+        mesitas.forEach(function (m) { var o = mk("option", null, m.name); o.value = m.id; ms.appendChild(o); });
+        ms.addEventListener("change", function () {
+          if (ms.value) db.collection("loans").doc(l.id).update({ mesita: ms.value }).catch(function (e) { showToast(errText(e, "No se pudo asignar."), false); });
+        });
+        li.appendChild(ms);
+      }
       if (canWrite() && l.returnedAt) {
         var re = mk("button", "btn", "Reabrir"); re.type = "button"; re.style.minHeight = "36px";
         re.addEventListener("click", function () { db.collection("loans").doc(l.id).update({ returnedAt: null, returnedBy: null }).catch(function (e) { showToast(errText(e, "No se pudo reabrir."), false); }); });
