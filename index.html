@@ -113,6 +113,13 @@ li input[type="text"] { padding: 8px 10px; }
 .tag.pend { color: var(--warn); background: var(--warnbg); }
 .tag.ok { color: var(--a2); background: var(--t2); }
 .txt b { font-weight: 700; }
+.overlay { position: fixed; inset: 0; z-index: 40; background: rgba(0,0,0,.85); display: flex; align-items: center; justify-content: center; padding: calc(16px + env(safe-area-inset-top, 0px)) 16px calc(16px + env(safe-area-inset-bottom, 0px)); }
+.overlay[hidden] { display: none; }
+#imgov { z-index: 60; }
+.overlay img { max-width: 100%; max-height: 80vh; border-radius: 12px; background: #fff; }
+.ov-card { background: var(--surface); color: var(--text); border-radius: 16px; width: 100%; max-width: 460px; max-height: 92vh; overflow-y: auto; padding: 16px; }
+.idtile { display: block; margin-top: 6px; font: inherit; font-size: .85rem; font-weight: 600; color: var(--text); background: var(--bg); border: 1.5px dashed var(--line); border-radius: 10px; padding: 8px 12px; cursor: pointer; text-align: left; max-width: 100%; }
+.idtile.sm { font-size: .78rem; padding: 5px 10px; }
 .mtag { display: inline-block; font-size: .7rem; font-weight: 700; padding: 1px 8px; border-radius: 999px; color: var(--accent, var(--muted)); background: var(--tint, var(--bg)); margin: 0 6px 2px 0; vertical-align: middle; }
 </style>
 <body>
@@ -140,7 +147,7 @@ var firebaseConfig = {
   var app = document.getElementById("app");
   var auth, db, authUser = null, me = null;
   var loans = [], users = [], catalog = DEFAULT_CATALOG.slice(), loansLoaded = false;
-  var mesitas = DEFAULT_MESITAS.slice(), mfilter = "todas", mesitaSel = "";
+  var mesitas = DEFAULT_MESITAS.slice(), mfilter = "todas", mesitaSel = "", formPhoto = null;
   try { mesitaSel = localStorage.getItem("lastMesita") || ""; } catch (e) {}
   var subMe = null, subData = [], activeRole = null, catQueue = Promise.resolve();
   var view = "ahora", editMode = false, filter = "todos", selected = [], drafts = {}, pendingDel = null, lastReturned = null, toastTimer = null, msg = "";
@@ -201,7 +208,8 @@ var firebaseConfig = {
         loans = s.docs.map(function (d) {
           var v = d.data();
           return { id: d.id, itemName: String(v.itemName || ""), borrower: String(v.borrower || ""), note: String(v.note || ""), mesita: String(v.mesita || ""), lentAt: v.lentAt || 0,
-                   lentBy: String(v.lentBy || ""), returnedAt: v.returnedAt || null, returnedBy: String(v.returnedBy || "") };
+                   lentBy: String(v.lentBy || ""), returnedAt: v.returnedAt || null, returnedBy: String(v.returnedBy || ""),
+                   hasPhoto: v.hasPhoto === true, editedAt: v.editedAt || null, editedBy: String(v.editedBy || "") };
         });
         loansLoaded = true; msg = ""; render();
       }, fail));
@@ -255,10 +263,13 @@ var firebaseConfig = {
     names.forEach(function (name, i) {
       var d = { itemName: name, borrower: who, mesita: mesitaSel, lentAt: now + i, lentBy: firstName(), returnedAt: null };
       if (note) d.note = note;
-      batch.set(db.collection("loans").doc(), d);
+      if (formPhoto) d.hasPhoto = true;
+      var ref = db.collection("loans").doc();
+      batch.set(ref, d);
+      if (formPhoto) batch.set(db.collection("loanPhotos").doc(ref.id), { data: formPhoto, by: firstName(), at: now });
     });
     batch.commit().then(function () {
-      selected = []; delete drafts.borrower; delete drafts.note; delete drafts.custom;
+      selected = []; formPhoto = null; delete drafts.borrower; delete drafts.note; delete drafts.custom;
       showToast("Registrado: " + names.join(", ") + " → " + who, false); render();
     }).catch(function (e) { showToast(errText(e, "No se pudo registrar. Probá de nuevo."), false); });
   }
@@ -339,6 +350,119 @@ var firebaseConfig = {
       box.appendChild(sws); card.appendChild(box);
     });
     return card;
+  }
+  var fileInput = document.createElement("input"); fileInput.type = "file"; fileInput.accept = "image/*"; fileInput.style.display = "none"; document.body.appendChild(fileInput);
+  var imgOv = mk("div", "overlay"); imgOv.id = "imgov"; imgOv.hidden = true; document.body.appendChild(imgOv);
+  var editOv = mk("div", "overlay"); editOv.hidden = true; document.body.appendChild(editOv);
+  imgOv.addEventListener("click", function (e) { if (e.target === imgOv || (e.target.classList && e.target.classList.contains("ov-close"))) { imgOv.hidden = true; imgOv.textContent = ""; } });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") { if (!imgOv.hidden) { imgOv.hidden = true; imgOv.textContent = ""; } else editOv.hidden = true; } });
+
+  function compressImage(file, cb) {
+    var url = URL.createObjectURL(file), img = new Image();
+    img.onload = function () {
+      URL.revokeObjectURL(url);
+      var w = img.naturalWidth, h = img.naturalHeight, sc = Math.min(1, 1000 / Math.max(w, h));
+      var c = document.createElement("canvas"); c.width = Math.max(1, Math.round(w * sc)); c.height = Math.max(1, Math.round(h * sc));
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      var q = 0.72, out = c.toDataURL("image/jpeg", q);
+      while (out.length > 300000 && q > 0.3) { q -= 0.1; out = c.toDataURL("image/jpeg", q); }
+      cb(out.length < 850000 ? out : null);
+    };
+    img.onerror = function () { URL.revokeObjectURL(url); cb(null); };
+    img.src = url;
+  }
+  function pickPhoto(cb) {
+    fileInput.value = "";
+    fileInput.onchange = function () {
+      var f = fileInput.files && fileInput.files[0]; if (!f) return;
+      compressImage(f, function (d) { if (!d) showToast("No se pudo usar esa foto. Probá con otra.", false); else cb(d); });
+    };
+    fileInput.click();
+  }
+  function showImage(src) {
+    imgOv.textContent = ""; imgOv.hidden = false;
+    var x = mk("button", "btn ov-close", "✕ Cerrar"); x.type = "button"; x.style.cssText = "position:absolute;top:calc(12px + env(safe-area-inset-top,0px));right:12px";
+    imgOv.appendChild(x);
+    if (src) { var im = mk("img"); im.src = src; im.alt = "Identificación"; imgOv.appendChild(im); }
+    else { var t = mk("p", null, "Cargando…"); t.style.color = "#fff"; imgOv.appendChild(t); }
+  }
+  function showLoanPhoto(id) {
+    showImage(null);
+    db.collection("loanPhotos").doc(id).get().then(function (s) {
+      if (!s.exists) { imgOv.hidden = true; imgOv.textContent = ""; showToast("No se encontró la foto.", false); return; }
+      showImage(s.data().data);
+    }).catch(function () { imgOv.hidden = true; imgOv.textContent = ""; showToast("No tenés permiso para ver la foto.", false); });
+  }
+  function extraInfo(tx, l) {
+    if (l.editedAt) tx.appendChild(mk("small", null, "✎ editado por " + (l.editedBy || "alguien") + " · " + fmt(l.editedAt)));
+    if (l.hasPhoto && canWrite()) {
+      var pt = mk("button", "idtile sm", "🪪 Identificación adjunta"); pt.type = "button";
+      pt.addEventListener("click", function () { showLoanPhoto(l.id); });
+      tx.appendChild(pt);
+    }
+  }
+  function editBtn(l) {
+    var b = mk("button", "btn", "✎"); b.type = "button"; b.style.minHeight = "36px"; b.setAttribute("aria-label", "Editar préstamo de " + l.borrower);
+    b.addEventListener("click", function () { openEdit(l); });
+    return b;
+  }
+  function openEdit(l) {
+    var st = { mesita: l.mesita, photo: null, removePhoto: false };
+    editOv.textContent = ""; editOv.hidden = false;
+    var box = mk("div", "ov-card"); box.appendChild(mk("h2", null, "Editar préstamo")); box.firstChild.style.margin = "0 0 8px";
+    function field(label, el) { var f = mk("div", "field"); f.style.padding = "8px 0 0"; f.appendChild(mk("label", null, label)); f.appendChild(el); box.appendChild(f); }
+    var bi = mk("input"); bi.type = "text"; bi.maxLength = 60; bi.value = l.borrower; field("Persona", bi);
+    var ii = mk("input"); ii.type = "text"; ii.maxLength = 60; ii.value = l.itemName; field("Cosa prestada", ii);
+    var chipsBox = mk("div", "chips"); chipsBox.style.padding = "0"; field("Mesita", chipsBox);
+    function drawChips() {
+      chipsBox.textContent = "";
+      mesitas.forEach(function (m) {
+        var info = mesitaInfo(m.id), c = mk("button", "chip" + (st.mesita === m.id ? " sel" : ""), m.name); c.type = "button";
+        c.style.setProperty("--accent", "var(--a" + info.k + ")");
+        c.addEventListener("click", function () { st.mesita = m.id; drawChips(); });
+        chipsBox.appendChild(c);
+      });
+    }
+    drawChips();
+    var ni = mk("input"); ni.type = "text"; ni.maxLength = 120; ni.value = l.note; ni.placeholder = "ej. lo devuelve el viernes"; field("Nota", ni);
+    var photoBox = mk("div"); field("Foto de identificación (oculta)", photoBox);
+    function drawPhoto() {
+      photoBox.textContent = "";
+      var has = st.photo ? true : (l.hasPhoto && !st.removePhoto);
+      var row = mk("div", "bar"); row.style.margin = "6px 0 0";
+      if (has) {
+        var tile = mk("button", "idtile", "🪪 Identificación adjunta · tocá para ver"); tile.type = "button"; tile.style.marginTop = "0";
+        tile.addEventListener("click", function () { if (st.photo) showImage(st.photo); else showLoanPhoto(l.id); });
+        photoBox.appendChild(tile);
+        var rep = mk("button", "btn", "Reemplazar"); rep.type = "button"; rep.addEventListener("click", function () { pickPhoto(function (d) { st.photo = d; st.removePhoto = false; drawPhoto(); }); });
+        var rm = mk("button", "btn danger", "Quitar foto"); rm.type = "button"; rm.addEventListener("click", function () { st.photo = null; st.removePhoto = true; drawPhoto(); });
+        row.appendChild(rep); row.appendChild(rm);
+      } else {
+        if (st.removePhoto) { var w = mk("p", "note", "La foto se quitará al guardar."); w.style.textAlign = "left"; photoBox.appendChild(w); }
+        var add = mk("button", "btn", "🪪 Agregar foto"); add.type = "button"; add.addEventListener("click", function () { pickPhoto(function (d) { st.photo = d; st.removePhoto = false; drawPhoto(); }); });
+        row.appendChild(add);
+      }
+      photoBox.appendChild(row);
+    }
+    drawPhoto();
+    var act = mk("div", "bar"); act.style.margin = "16px 0 0";
+    var cancel = mk("button", "btn", "Cancelar"); cancel.type = "button"; cancel.addEventListener("click", function () { editOv.hidden = true; });
+    var save = mk("button", "btn primary", "Guardar cambios"); save.type = "button";
+    save.addEventListener("click", function () {
+      var b = clean(bi.value), it = clean(ii.value), n = clean(ni.value);
+      if (!b || !it) { showToast("La persona y la cosa no pueden quedar vacías.", false); return; }
+      if (!st.mesita) { showToast("Elegí la mesita.", false); return; }
+      var willPhoto = st.photo ? true : (l.hasPhoto && !st.removePhoto);
+      var batch = db.batch();
+      batch.update(db.collection("loans").doc(l.id), { itemName: it, borrower: b, mesita: st.mesita, note: n, hasPhoto: willPhoto, editedAt: Date.now(), editedBy: firstName() });
+      if (st.photo) batch.set(db.collection("loanPhotos").doc(l.id), { data: st.photo, by: firstName(), at: Date.now() });
+      else if (st.removePhoto) batch.delete(db.collection("loanPhotos").doc(l.id));
+      save.disabled = true;
+      batch.commit().then(function () { editOv.hidden = true; showToast("Cambios guardados.", false); })
+        .catch(function (e) { save.disabled = false; showToast(errText(e, "No se pudo guardar. Probá de nuevo."), false); });
+    });
+    act.appendChild(cancel); act.appendChild(save); box.appendChild(act);
+    editOv.appendChild(box);
   }
   function csvCell(v) { v = String(v == null ? "" : v); return /[",;\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
   function downloadCsv() {
@@ -465,6 +589,19 @@ var firebaseConfig = {
     var f4 = mk("div", "field"); f4.style.paddingBottom = "12px"; f4.appendChild(mk("label", null, "Nota (opcional)"));
     f4.appendChild(draftInput("note", "", "ej. lo devuelve el viernes", 120)); card.appendChild(f4);
 
+    var f6 = mk("div", "field"); f6.style.paddingBottom = "12px"; f6.appendChild(mk("label", null, "Foto de identificación (opcional, queda oculta)"));
+    if (formPhoto) {
+      var tl = mk("button", "idtile", "🪪 Identificación adjunta · tocá para ver"); tl.type = "button"; tl.style.marginTop = "0";
+      tl.addEventListener("click", function () { showImage(formPhoto); });
+      var rmv = mk("button", "btn danger", "Quitar foto"); rmv.type = "button"; rmv.style.marginTop = "8px"; rmv.addEventListener("click", function () { formPhoto = null; render(); });
+      f6.appendChild(tl); f6.appendChild(rmv);
+    } else {
+      var ad = mk("button", "btn", "🪪 Agregar foto"); ad.type = "button";
+      ad.addEventListener("click", function () { pickPhoto(function (d) { formPhoto = d; render(); }); });
+      f6.appendChild(ad);
+    }
+    card.appendChild(f6);
+
     var f5 = mk("div"); f5.style.padding = "0 16px 16px";
     var go = mk("button", "btn primary", "Registrar préstamo"); go.type = "button"; go.addEventListener("click", registerLoan);
     f5.appendChild(go); card.appendChild(f5);
@@ -525,7 +662,8 @@ var firebaseConfig = {
       var tx = mk("span", "txt"); tx.appendChild(mtag(l.mesita)); var strong = mk("b", null, l.itemName); tx.appendChild(strong); tx.appendChild(document.createTextNode(" → " + l.borrower));
       tx.appendChild(mk("small", null, "Prestado " + ago(l.lentAt) + " (" + fmt(l.lentAt) + ")" + (l.lentBy ? " · anotó " + l.lentBy : "")));
       if (l.note) tx.appendChild(mk("small", null, "📝 " + l.note));
-      li.appendChild(tx); ul.appendChild(li);
+      extraInfo(tx, l);
+      li.appendChild(tx); if (canWrite()) li.appendChild(editBtn(l)); ul.appendChild(li);
     });
     card.appendChild(ul); app.appendChild(card);
   }
@@ -566,7 +704,9 @@ var firebaseConfig = {
       tx.appendChild(mk("small", null, "Prestado: " + fmt(l.lentAt) + (l.lentBy ? " · anotó " + l.lentBy : "")));
       if (l.returnedAt) tx.appendChild(mk("small", null, "Devuelto: " + fmt(l.returnedAt) + (l.returnedBy ? " · recibió " + l.returnedBy : "")));
       if (l.note) tx.appendChild(mk("small", null, "📝 " + l.note));
+      extraInfo(tx, l);
       li.appendChild(tx);
+      if (canWrite()) li.appendChild(editBtn(l));
       if (!l.mesita && canWrite()) {
         var ms = mk("select"); ms.style.cssText = "flex:0 0 auto;width:140px;padding:6px 8px";
         var o0 = mk("option", null, "¿Qué mesita?"); o0.value = ""; ms.appendChild(o0);
@@ -585,7 +725,7 @@ var firebaseConfig = {
         var del = mk("button", "btn danger", pendingDel === l.id ? "¿Seguro?" : "✕"); del.type = "button"; del.style.minHeight = "36px";
         del.addEventListener("click", function () {
           if (pendingDel !== l.id) { pendingDel = l.id; render(); return; }
-          pendingDel = null; db.collection("loans").doc(l.id).delete().catch(function (e) { showToast(errText(e, "No se pudo borrar."), false); });
+          pendingDel = null; db.collection("loanPhotos").doc(l.id).delete().catch(function () {}); db.collection("loans").doc(l.id).delete().catch(function (e) { showToast(errText(e, "No se pudo borrar."), false); });
         });
         li.appendChild(del);
       }
