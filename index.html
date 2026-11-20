@@ -115,7 +115,8 @@ li input[type="text"] { padding: 8px 10px; }
 .txt b { font-weight: 700; }
 .overlay { position: fixed; inset: 0; z-index: 40; background: rgba(0,0,0,.85); display: flex; align-items: center; justify-content: center; padding: calc(16px + env(safe-area-inset-top, 0px)) 16px calc(16px + env(safe-area-inset-bottom, 0px)); }
 .overlay[hidden] { display: none; }
-#imgov { z-index: 60; }
+#imgov, #camov { z-index: 60; }
+.overlay video { width: min(100%, 420px); border-radius: 14px; background: #000; }
 .overlay img { max-width: 100%; max-height: 80vh; border-radius: 12px; background: #fff; }
 .ov-card { background: var(--surface); color: var(--text); border-radius: 16px; width: 100%; max-width: 460px; max-height: 92vh; overflow-y: auto; padding: 16px; }
 .idtile { display: block; margin-top: 6px; font: inherit; font-size: .85rem; font-weight: 600; color: var(--text); background: var(--bg); border: 1.5px dashed var(--line); border-radius: 10px; padding: 8px 12px; cursor: pointer; text-align: left; max-width: 100%; }
@@ -355,7 +356,7 @@ var firebaseConfig = {
   var imgOv = mk("div", "overlay"); imgOv.id = "imgov"; imgOv.hidden = true; document.body.appendChild(imgOv);
   var editOv = mk("div", "overlay"); editOv.hidden = true; document.body.appendChild(editOv);
   imgOv.addEventListener("click", function (e) { if (e.target === imgOv || (e.target.classList && e.target.classList.contains("ov-close"))) { imgOv.hidden = true; imgOv.textContent = ""; } });
-  document.addEventListener("keydown", function (e) { if (e.key === "Escape") { if (!imgOv.hidden) { imgOv.hidden = true; imgOv.textContent = ""; } else editOv.hidden = true; } });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") { if (!camOv.hidden) closeCamera(); else if (!imgOv.hidden) { imgOv.hidden = true; imgOv.textContent = ""; } else editOv.hidden = true; } });
 
   function compressImage(file, cb) {
     var url = URL.createObjectURL(file), img = new Image();
@@ -378,6 +379,62 @@ var firebaseConfig = {
       compressImage(f, function (d) { if (!d) showToast("No se pudo usar esa foto. Probá con otra.", false); else cb(d); });
     };
     fileInput.click();
+  }
+  var camOv = mk("div", "overlay"); camOv.id = "camov"; camOv.hidden = true; camOv.style.flexDirection = "column"; camOv.style.gap = "12px"; document.body.appendChild(camOv);
+  var camStream = null;
+  function stopStream() { if (camStream) { camStream.getTracks().forEach(function (t) { t.stop(); }); camStream = null; } }
+  function closeCamera() { stopStream(); camOv.hidden = true; camOv.textContent = ""; }
+  function canvasToJpeg(c) {
+    var q = 0.72, out = c.toDataURL("image/jpeg", q);
+    while (out.length > 300000 && q > 0.3) { q -= 0.1; out = c.toDataURL("image/jpeg", q); }
+    return out.length < 850000 ? out : null;
+  }
+  function phoneCamera(cb) {
+    fileInput.setAttribute("capture", "environment");
+    pickPhoto(cb);
+    setTimeout(function () { fileInput.removeAttribute("capture"); }, 0);
+  }
+  function takePhoto(cb) {
+    camOv.textContent = ""; camOv.hidden = false;
+    var video = mk("video"); video.setAttribute("playsinline", "true"); video.muted = true;
+    var hint = mk("p", null, "Encuadrá el documento y tocá el botón"); hint.style.cssText = "color:#fff;text-align:center;margin:0";
+    var row = mk("div", "bar"); row.style.cssText = "margin:0;justify-content:center";
+    var shot = mk("button", "btn primary", "📸 Sacar foto"); shot.type = "button";
+    var cancel = mk("button", "btn", "✕ Cancelar"); cancel.type = "button"; cancel.addEventListener("click", closeCamera);
+    row.appendChild(shot); row.appendChild(cancel);
+    camOv.appendChild(video); camOv.appendChild(hint); camOv.appendChild(row);
+    shot.addEventListener("click", function () {
+      if (!video.videoWidth) return;
+      var sc = Math.min(1, 1000 / Math.max(video.videoWidth, video.videoHeight)), c = document.createElement("canvas");
+      c.width = Math.round(video.videoWidth * sc); c.height = Math.round(video.videoHeight * sc);
+      c.getContext("2d").drawImage(video, 0, 0, c.width, c.height);
+      var out = canvasToJpeg(c);
+      if (!out) { showToast("No se pudo usar la foto. Probá de nuevo.", false); return; }
+      stopStream(); camOv.textContent = "";
+      var im = mk("img"); im.src = out; im.alt = "Vista previa";
+      var q = mk("p", null, "¿Se lee bien el documento?"); q.style.cssText = "color:#fff;text-align:center;margin:0";
+      var r2 = mk("div", "bar"); r2.style.cssText = "margin:0;justify-content:center";
+      var use = mk("button", "btn primary", "✓ Usar esta foto"); use.type = "button"; use.addEventListener("click", function () { closeCamera(); cb(out); });
+      var again = mk("button", "btn", "↺ Repetir"); again.type = "button"; again.addEventListener("click", function () { closeCamera(); takePhoto(cb); });
+      r2.appendChild(use); r2.appendChild(again); camOv.appendChild(im); camOv.appendChild(q); camOv.appendChild(r2);
+    });
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { camFail(cb); return; }
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false })
+      .then(function (stream) { camStream = stream; video.srcObject = stream; return video.play(); })
+      .catch(function () { camFail(cb); });
+  }
+  function camFail(cb) {
+    stopStream(); camOv.textContent = ""; camOv.hidden = false;
+    var t = mk("p", null, "No se pudo abrir la cámara dentro de la página. Revisá que hayas permitido el acceso a la cámara, o usá la cámara del celular."); t.style.cssText = "color:#fff;text-align:center;margin:0;max-width:380px";
+    var row = mk("div", "bar"); row.style.cssText = "margin:0;justify-content:center";
+    var ph = mk("button", "btn primary", "📱 Usar la cámara del celular"); ph.type = "button"; ph.addEventListener("click", function () { closeCamera(); phoneCamera(cb); });
+    var cx = mk("button", "btn", "Cancelar"); cx.type = "button"; cx.addEventListener("click", closeCamera);
+    row.appendChild(ph); row.appendChild(cx); camOv.appendChild(t); camOv.appendChild(row);
+  }
+  function photoButtons(row, cbFn, labelCam) {
+    var c = mk("button", "btn" + (labelCam ? "" : " primary"), labelCam || "📷 Sacar foto"); c.type = "button"; c.addEventListener("click", function () { takePhoto(cbFn); });
+    var g = mk("button", "btn", "🖼 Galería"); g.type = "button"; g.addEventListener("click", function () { pickPhoto(cbFn); });
+    row.appendChild(c); row.appendChild(g);
   }
   function showImage(src) {
     imgOv.textContent = ""; imgOv.hidden = false;
@@ -434,13 +491,12 @@ var firebaseConfig = {
         var tile = mk("button", "idtile", "🪪 Identificación adjunta · tocá para ver"); tile.type = "button"; tile.style.marginTop = "0";
         tile.addEventListener("click", function () { if (st.photo) showImage(st.photo); else showLoanPhoto(l.id); });
         photoBox.appendChild(tile);
-        var rep = mk("button", "btn", "Reemplazar"); rep.type = "button"; rep.addEventListener("click", function () { pickPhoto(function (d) { st.photo = d; st.removePhoto = false; drawPhoto(); }); });
+        photoButtons(row, function (d) { st.photo = d; st.removePhoto = false; drawPhoto(); }, "📷 Otra foto");
         var rm = mk("button", "btn danger", "Quitar foto"); rm.type = "button"; rm.addEventListener("click", function () { st.photo = null; st.removePhoto = true; drawPhoto(); });
-        row.appendChild(rep); row.appendChild(rm);
+        row.appendChild(rm);
       } else {
         if (st.removePhoto) { var w = mk("p", "note", "La foto se quitará al guardar."); w.style.textAlign = "left"; photoBox.appendChild(w); }
-        var add = mk("button", "btn", "🪪 Agregar foto"); add.type = "button"; add.addEventListener("click", function () { pickPhoto(function (d) { st.photo = d; st.removePhoto = false; drawPhoto(); }); });
-        row.appendChild(add);
+        photoButtons(row, function (d) { st.photo = d; st.removePhoto = false; drawPhoto(); });
       }
       photoBox.appendChild(row);
     }
@@ -596,9 +652,9 @@ var firebaseConfig = {
       var rmv = mk("button", "btn danger", "Quitar foto"); rmv.type = "button"; rmv.style.marginTop = "8px"; rmv.addEventListener("click", function () { formPhoto = null; render(); });
       f6.appendChild(tl); f6.appendChild(rmv);
     } else {
-      var ad = mk("button", "btn", "🪪 Agregar foto"); ad.type = "button";
-      ad.addEventListener("click", function () { pickPhoto(function (d) { formPhoto = d; render(); }); });
-      f6.appendChild(ad);
+      var adRow = mk("div", "bar"); adRow.style.margin = "0";
+      photoButtons(adRow, function (d) { formPhoto = d; render(); });
+      f6.appendChild(adRow);
     }
     card.appendChild(f6);
 
